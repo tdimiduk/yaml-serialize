@@ -24,16 +24,15 @@
 # TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 # DAMAGE.
-"""
-Root class for all of holopy.  This class provides serialization to and from
-yaml text file for all holopy objects.
+"""A simple wrapper around PyYAML to automatically serialize objects
+which are uniquely specified by their constructor arguments
 
 yaml files are structured text files designed to be easy for humans to
-read and write but also easy for computers to read.  HoloPy uses them
-to store information about experimental conditions and to describe
+read and write but also easy for computers to read.
 analysis procedures.
 
-.. moduleauthor:: Tom Dimiduk <tdimiduk@physics.harvard.edu>
+.. moduleauthor:: Tom Dimiduk <triplepoint217@gmail.com>
+
 """
 try:
     from collections import OrderedDict
@@ -42,6 +41,19 @@ except ImportError:
 import inspect
 import numpy as np
 import yaml
+
+def save(outf, obj):
+    if isinstance(outf, basestring):
+        outf = file(outf, 'wb')
+
+    yaml.dump(obj, outf)
+
+def load(inf):
+    if isinstance(inf, basestring):
+        inf = file(inf, mode = 'rU')
+    obj = yaml.load(inf)
+    return obj
+
 
 # Metaclass black magic to eliminate need for adding yaml_tag lines to classes
 class SerializableMetaclass(yaml.YAMLObjectMetaclass):
@@ -53,7 +65,7 @@ class SerializableMetaclass(yaml.YAMLObjectMetaclass):
         cls.yaml_dumper.add_representer(cls, cls.to_yaml)
 
 
-class Serializable:
+        class Serializable(yaml.YAMLObject):
     """Class implementing yaml serialization
 
     Provides machinery for serializing subclasses to and from yaml
