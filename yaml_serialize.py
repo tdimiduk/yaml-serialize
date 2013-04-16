@@ -39,7 +39,10 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 import inspect
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 import yaml
 
 def save(outf, obj):
@@ -65,7 +68,7 @@ class SerializableMetaclass(yaml.YAMLObjectMetaclass):
         cls.yaml_dumper.add_representer(cls, cls.to_yaml)
 
 
-        class Serializable(yaml.YAMLObject):
+class Serializable(yaml.YAMLObject):
     """Class implementing yaml serialization
 
     Provides machinery for serializing subclasses to and from yaml
@@ -83,7 +86,7 @@ class SerializableMetaclass(yaml.YAMLObjectMetaclass):
         for var in inspect.getargspec(self.__init__).args[1:]:
             if getattr(self, var, None) is not None:
                 item = getattr(self, var)
-                if isinstance(item, np.ndarray) and item.ndim == 1:
+                if np and isinstance(item, np.ndarray) and item.ndim == 1:
                     item = list(item)
                 dump_dict[var] = item
 
@@ -119,57 +122,72 @@ def ordered_dump(dumper, tag, data):
     return node
 
 
-###################################################################
+# ------------------------
 # Custom Yaml Representers
-###################################################################
-# These functions provide prettier representation of some numpy
-# types.
-###################################################################
+# ------------------------
+# Special case handling of some data types for prettier yaml files
 
-def ignore_aliases(data):
-    try:
-        if data in [None, ()]:
-            return True
-        if isinstance(data, (str, unicode, bool, int, float)):
-            return True
-    except TypeError, e:
-        pass
-yaml.representer.SafeRepresenter.ignore_aliases = \
-    staticmethod(ignore_aliases)
-
-# Represent 1d ndarrays as lists in yaml files because it makes them much
-# prettier
-def ndarray_representer(dumper, data):
-    return dumper.represent_list(data.tolist())
-yaml.add_representer(np.ndarray, ndarray_representer)
 
 # represent tuples as lists because yaml doesn't have tuples
 def tuple_representer(dumper, data):
     return dumper.represent_list(list(data))
 yaml.add_representer(tuple, tuple_representer)
 
-# represent numpy types as things that will print more cleanly
+# Slightly weird hack to fix a yaml bug. I don't remember what it was
+# at the moment -tgd 2013-04-16
+def ignore_aliases(data):
+    try:
+        if data in [None, ()]:
+            return True
+        if isinstance(data, (str, unicode, bool, int, float)):
+            return True
+    except TypeError:
+        pass
+yaml.representer.SafeRepresenter.ignore_aliases = \
+    staticmethod(ignore_aliases)
+
 def complex_representer(dumper, data):
     return dumper.represent_scalar('!complex', repr(data.tolist()))
-yaml.add_representer(np.complex128, complex_representer)
+yaml.add_representer(complex, complex_representer)
+
 def complex_constructor(loader, node):
     return complex(node.value)
 yaml.add_constructor('!complex', complex_constructor)
 
-def numpy_float_representer(dumper, data):
-    return dumper.represent_float(float(data))
-yaml.add_representer(np.float64, numpy_float_representer)
+# Numpy Specific Representers
+# ---------------------------
+# NumPy specific prettier representations. Only define these if numpy
+# is installed.
+if np is not None:
+    # Represent 1d ndarrays as lists in yaml files because it makes them much
+    # prettier
+    def ndarray_representer(dumper, data):
+        return dumper.represent_list(data.tolist())
+    yaml.add_representer(np.ndarray, ndarray_representer)
 
-def numpy_int_representer(dumper, data):
-    return dumper.represent_int(int(data))
-yaml.add_representer(np.int64, numpy_int_representer)
-yaml.add_representer(np.int32, numpy_int_representer)
+    # represent numpy types as things that will print more cleanly
+    def complex_representer(dumper, data):
+        return dumper.represent_scalar('!complex', repr(data.tolist()))
+    yaml.add_representer(np.complex128, complex_representer)
+    yaml.add_representer(np.complex, complex_representer)
+    def complex_constructor(loader, node):
+        return complex(node.value)
+    yaml.add_constructor('!complex', complex_constructor)
 
-def numpy_dtype_representer(dumper, data):
-    return dumper.represent_scalar('!dtype', data.name)
-yaml.add_representer(np.dtype, numpy_dtype_representer)
+    def numpy_float_representer(dumper, data):
+        return dumper.represent_float(float(data))
+    yaml.add_representer(np.float64, numpy_float_representer)
 
-def numpy_dtype_loader(loader, node):
-    name = loader.construct_scalar(node)
-    return np.dtype(name)
-yaml.add_constructor('!dtype', numpy_dtype_loader)
+    def numpy_int_representer(dumper, data):
+        return dumper.represent_int(int(data))
+    yaml.add_representer(np.int64, numpy_int_representer)
+    yaml.add_representer(np.int32, numpy_int_representer)
+
+    def numpy_dtype_representer(dumper, data):
+        return dumper.represent_scalar('!dtype', data.name)
+    yaml.add_representer(np.dtype, numpy_dtype_representer)
+
+    def numpy_dtype_loader(loader, node):
+        name = loader.construct_scalar(node)
+        return np.dtype(name)
+    yaml.add_constructor('!dtype', numpy_dtype_loader)
