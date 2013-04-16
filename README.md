@@ -31,6 +31,9 @@ Installation
 yaml-serialize is a simple file that is BSD licensed so that you can
 just include it directly in your projects.
 
+yaml-serialize depends only on PyYAML. If you have NumPy installed, it will
+define some extra things to make output of numpy stuff a little prettier.
+
 If you prefer, you can also put the yaml-serialize.py file somewhere on your
 pythonpath for system wide use.
 
@@ -41,4 +44,4 @@ yaml-serialize has a small test suite intended to be run with nose. Run:
 
     nosetests
 
-at a console in the same directory as this readme
+at a console in the same directory as this README.
